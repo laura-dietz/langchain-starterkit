@@ -23,8 +23,8 @@ tira_configs:
   truth_format:
     name: "trec-eval-leaderboard"
   evaluator:
-    image: ghcr.io/trec-auto-judge/auto-judge-code/cli:0.0.2
-    command: trec-auto-judge evaluate --input ${inputRun}/*eval.txt --aggregate --output ${outputDir}/evaluation.prototext
+    image: ghcr.io/trec-auto-judge/auto-judge-code/cli:0.0.3
+    command: /evaluator.py $inputDataset/eval/kiddie_fake.eval.ir_measures.txt ${inputRun} ${outputDir}
 ---
 
 # Minimal Spot Check Dataset: Kiddy
