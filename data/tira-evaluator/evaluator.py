@@ -41,7 +41,7 @@ def main(truth_format, eval_format, truth_leaderboard, input_directory, output_d
             print(l)
             measures.add(l["EvalMeasure"])
             for s in scores:
-                scores[s].append(l[s])
+                scores[s].append(l[s] if l[s] is not None else 0)
     
     ret = {"Eval-Measures": len(measures)}
     for s in sorted(scores.keys()):
