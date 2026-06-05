@@ -34,7 +34,7 @@ jobs:
             --path . \
             --file judges/naive/Dockerfile \
             --task trec-auto-judge \
-            --dataset kiddie-20260403-training \
+            --dataset kiddie-20260605-training \
             --command 'auto-judge run --workflow /auto-judge/judges/naive/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 
       - name: Test judges/tinyjudge
@@ -45,7 +45,7 @@ jobs:
             --forward-environment-variable OPENAI_BASE_URL OPENAI_MODEL OPENAI_API_KEY \
             --file judges/tinyjudge/Dockerfile \
             --task trec-auto-judge \
-            --dataset kiddie-20260403-training \
+            --dataset kiddie-20260605-training \
             --command 'auto-judge run --workflow /auto-judge/judges/tinyjudge/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 
       - name: Test judges/pyterrier_retrieval
@@ -55,7 +55,7 @@ jobs:
             --path . \
             --file judges/pyterrier_retrieval/Dockerfile \
             --task trec-auto-judge \
-            --dataset kiddie-20260403-training \
+            --dataset kiddie-20260605-training \
             --command 'auto-judge run --workflow /auto-judge/judges/pyterrier_retrieval/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 
       - name: Test judges/ir_axioms
@@ -69,6 +69,6 @@ jobs:
             --mount-hf-model facebook/fasttext-en-vectors \
             --file judges/ir_axioms/Dockerfile \
             --task trec-auto-judge \
-            --dataset kiddie-20260403-training \
+            --dataset kiddie-20260605-training \
             --command 'echo 127.0.0.1\ localhost >> /etc/hosts; auto-judge run --workflow /auto-judge/judges/ir_axioms/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 

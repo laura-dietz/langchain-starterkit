@@ -24,7 +24,7 @@ tira-cli code-submission \
             --path . \
             --file judges/ir_axioms/Dockerfile \
             --task trec-auto-judge \
-            --dataset kiddie-20260403-training \
+            --dataset kiddie-20260605-training \
             --mount-hf-model facebook/fasttext-en-vectors \
             --command 'auto-judge run --workflow /auto-judge/judges/ir_axioms/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 ```
