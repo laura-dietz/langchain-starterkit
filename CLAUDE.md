@@ -42,6 +42,7 @@ On **"Setup checklist"**: Walk through the fork checklist interactively, one ste
 ### Step 4: Judge implementation
 - If judge directory exists, read the judge module. Check whether `judge()` method exists and returns a `Leaderboard`.
 - Check for `create_nuggets()` and `create_qrels()` if workflow.yml enables them.
+- **Check MeasureSpec descriptions**: Each `MeasureSpec` should have a meaningful `description` parameter explaining what the measure represents (e.g., `MeasureSpec("RELEVANCE", description="LLM-judged relevance score (0.0-1.0)")`). Prompt the developer to add descriptions if missing.
 - Reference: `DEVELOPER_HOWTO.md` section "5. Implement Your Judge" for minimal and full protocol templates.
 - Also read `judges/complete_example/` for the full protocol pattern, or `judges/tinyjudge/` for the minimal LLM pattern.
 - Ask: *Does your judge need nuggets, qrels, or just a leaderboard?*
@@ -95,6 +96,7 @@ auto-judge-evaluate meta-evaluate \
 - **Config layering:** env -> yaml -> cli (each overrides the previous).
 - **`{_name}` in `filebase`:** Automatically names output files after the variant/sweep being run.
 - **Sort by `run_id`** before creating comparison pairs for deterministic prompt ordering and cache consistency.
+- **MeasureSpec descriptions:** Always add a `description` parameter to each `MeasureSpec` explaining what the measure represents, its range, and interpretation. These descriptions are exported to `measures.yml` for documentation.
 
 ## Key References
 

@@ -126,7 +126,9 @@ See the [autojudge-evaluate README](https://github.com/trec-auto-judge/auto-judg
 ```python
 from autojudge_base import Leaderboard, LeaderboardBuilder, LeaderboardSpec, MeasureSpec
 
-MY_SPEC = LeaderboardSpec(measures=(MeasureSpec("MY_SCORE"),))
+MY_SPEC = LeaderboardSpec(measures=(
+    MeasureSpec("MY_SCORE", description="Overall quality score (0.0-1.0)"),
+))
 
 class MyJudge:
     def judge(self, rag_responses, rag_topics, llm_config, **kwargs) -> Leaderboard:
