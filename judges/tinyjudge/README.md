@@ -15,7 +15,7 @@ Submit to tira:
 tira-cli code-submission \
     --dry-run \
     --path . \
-    --file judges/tinyjudge/Dockerfile \
+    --cache-behaviour deterministic \
     --task trec-auto-judge \
     --dataset kiddie-20260605-training \
     --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
