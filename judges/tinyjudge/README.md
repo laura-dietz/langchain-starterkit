@@ -89,10 +89,13 @@ tira-cli code-submission \
     --command 'auto-judge run --workflow /auto-judge/judges/tinyjudge/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 ```
 
-Explanation:
+If everything worked, the output should look like this:
 
-xy.
+<img width="1807" height="259" alt="Screenshot_20260703_165606" src="https://github.com/user-attachments/assets/409ce157-53b9-48ee-bd36-a01d46f9d352" />
 
+For explanation, the `--cache-behaviour deterministic` flag indicated that the software is intended to produce the same deterministic output when running from the cache, during the submission process, we run the software then twice and store that this is expected in the metadata, this helps us to incorporat the submitted software into replicability experiments.
+
+For more details on the submission workflow and on how to prepare your software, please have a short look at the [TIRA participant documentation](https://docs.tira.io/participants/participate.html#prepare-your-submission). (The AutoJudge starter kit is already developed so that everything should be compatible with TIRA without much effort.)
 
 
 ## Run a published Naive Judge
@@ -109,28 +112,28 @@ tira-cli run local --approach trec-auto-judge/webis/tinyjudge \
 
 The output should look like:
 
-<img width="1030" height="393" alt="Screenshot_20260703_160041" src="https://github.com/user-attachments/assets/7e0d8348-d5d2-48b7-b986-33b0a2a91039" />
+<img width="957" height="389" alt="Screenshot_20260703_170402" src="https://github.com/user-attachments/assets/1bcf0fb9-dda4-4819-9d6d-25e52c7fd62b" />
 
-(This is similar how we then run private submitted AutoJudges on the test datasets, potentially via different LLMs.)
-
-
-# Re-Execution of approaches from TIRA
-
-Approaches that have been published can be easily 
-
-
-Re-Executing things with an cache:
+We can also use LLM with an empty cache directory, for this, first export environment variables:
 
 ```
-
+export OPENAI_API_KEY=...
+export OPENAI_BASE_URL=...
+export OPENAI_MODEL=...
 ```
 
-vs
+then, we can run xy:
 
+```bash
+tira-cli run local \
+    --approach trec-auto-judge/webis/tinyjudge \
+    --input kiddie-20260605-training \
+    --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
+    --mount-cache "CACHE_DIR=EMPTY_DIR"
 ```
-OPENAI_API_KEY=empty OPENAI_BASE_URL=empty OPENAI_MODEL=llama-3.1-8b-instant \
-    tira-cli run local --approach trec-auto-judge/webis/tinyjudge \
-        --input kiddie-20260605-training \
-        --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
-        --mount-cache "CACHE_DIR=../../data/example-caches/2026-07-01-05-48-25/CACHE_DIR/"
-```
+
+The output should look like:
+
+<img width="957" height="389" alt="Screenshot_20260703_170630" src="https://github.com/user-attachments/assets/124ab00c-6312-4fbc-ac9a-b3a37fde2257" />
+
+Please note that the result directory also contains the `CACHE_DIR` that could potentially be re-used. This is similar how we then run private submitted AutoJudges on the test datasets, potentially via different LLMs.)
