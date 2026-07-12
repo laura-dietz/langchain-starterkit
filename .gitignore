@@ -3,10 +3,9 @@ __pycache__
 test-coverage
 .coverage
 *.egg-info/
-out/
-output/
+.venv/
+cache/
+example-cache-kiddie/
+out*/
 results/
 *.zip
-example-cache-kiddie/
-output-naive/
-output-kiddie/
