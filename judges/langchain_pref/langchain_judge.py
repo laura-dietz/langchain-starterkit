@@ -161,6 +161,30 @@ def build_llm(llm_config: LlmConfigProtocol):
         from langchain_core.globals import set_llm_cache
         from sqlalchemy import create_engine
 
+        # LangChain's default cache key includes openai_api_base — but TIRA's
+        # deterministic re-execution swaps the endpoint to EMPTY and expects the
+        # judge to reproduce from cache alone, so the key must be endpoint-
+        # agnostic (model, prompt, and sampling params still key as usual).
+        # Legacy entries (keyed with the endpoint) are read and self-migrated.
+        base_re = re.compile(r'"openai_api_base":\s*"[^"]*"')
+
+        class EndpointAgnosticCache(SQLAlchemyCache):
+            @staticmethod
+            def _norm(llm_string: str) -> str:
+                return base_re.sub('"openai_api_base": "*"', llm_string)
+
+            def lookup(self, prompt, llm_string):
+                normalized = self._norm(llm_string)
+                hit = super().lookup(prompt, normalized)
+                if hit is None and normalized != llm_string:
+                    hit = super().lookup(prompt, llm_string)   # legacy key
+                    if hit is not None:
+                        super().update(prompt, normalized, hit)  # self-migrate
+                return hit
+
+            def update(self, prompt, llm_string, return_val):
+                super().update(prompt, self._norm(llm_string), return_val)
+
         # The cache db holds only this judge's own responses (trusted data), so
         # LangChain's pending-deprecation warning about `allowed_objects` for
         # untrusted deserialization does not apply here -- silence it.
@@ -178,7 +202,7 @@ def build_llm(llm_config: LlmConfigProtocol):
         # SQLiteCache with a busy-timeout engine: topics run concurrently and
         # share this db, so brief write contention must wait, not error.
         engine = create_engine(f"sqlite:///{db}", connect_args={"timeout": 30})
-        set_llm_cache(SQLAlchemyCache(engine))
+        set_llm_cache(EndpointAgnosticCache(engine))
         print(f"[langchain_pref] Prompt cache: {db.resolve()}", file=sys.stderr)
 
     # Backend-specific request params arrive through llm_config.raw, e.g. in
