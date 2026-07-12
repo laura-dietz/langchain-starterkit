@@ -1,0 +1,4 @@
+{"run":"run1","truth_score":0.864,"eval_score":61.8,"in_top_k":true,"kept":true,"issue":null}
+{"run":"run2","truth_score":0.692,"eval_score":41.8,"in_top_k":true,"kept":true,"issue":null}
+{"run":"run3","truth_score":0.316,"eval_score":67.0,"in_top_k":true,"kept":true,"issue":null}
+{"run":"run4","truth_score":0.088,"eval_score":64.0,"in_top_k":true,"kept":true,"issue":null}

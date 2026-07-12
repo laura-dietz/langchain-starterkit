@@ -1,0 +1,4 @@
+{"run":"run1","truth_score":0.864,"eval_score":0.38511328631331815,"in_top_k":true,"kept":true,"issue":null}
+{"run":"run2","truth_score":0.692,"eval_score":0.5056370262243526,"in_top_k":true,"kept":true,"issue":null}
+{"run":"run3","truth_score":0.316,"eval_score":0.5463347901057685,"in_top_k":true,"kept":true,"issue":null}
+{"run":"run4","truth_score":0.088,"eval_score":0.49173387916874095,"in_top_k":true,"kept":true,"issue":null}
