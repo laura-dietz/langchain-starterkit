@@ -25,6 +25,7 @@ caching uses LangChain's SQLiteCache stored under ``llm_config.cache_dir``.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import warnings
@@ -205,10 +206,11 @@ def build_llm(llm_config: LlmConfigProtocol):
         set_llm_cache(EndpointAgnosticCache(engine))
         print(f"[langchain_pref] Prompt cache: {db.resolve()}", file=sys.stderr)
 
-    # Backend-specific request params arrive through llm_config.raw, e.g. in
-    # llm-config.yml:  extra_body: {reasoning: {effort: low}}   (trims gpt-oss
-    # reasoning tokens; harmless for models that ignore it)
-    extra_body = (llm_config.raw or {}).get("extra_body") or None
+    # Backend-specific request params arrive through the OPENAI_EXTRA_BODY
+    # environment variable as JSON, e.g. '{"reasoning": {"effort": "low"}}'
+    # (trims gpt-oss reasoning tokens; harmless for models that ignore it)
+    extra_raw = os.environ.get("OPENAI_EXTRA_BODY")
+    extra_body = json.loads(extra_raw) if extra_raw else None
 
     return ChatOpenAI(
         model=llm_config.model,

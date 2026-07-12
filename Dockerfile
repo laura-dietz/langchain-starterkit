@@ -3,7 +3,6 @@ FROM ghcr.io/trec-auto-judge/trec-auto-judge-base:dev-0.0.1
 
 ADD judges /auto-judge/judges
 ADD pyproject.toml /auto-judge/
-ADD llm-config.yml /auto-judge/
 
 WORKDIR /auto-judge
 

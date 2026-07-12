@@ -38,7 +38,7 @@ If the judge calls an LLM, set the endpoint per [configure-llm-endpoint](https:/
 export OPENAI_BASE_URL=...  OPENAI_MODEL=...  OPENAI_API_KEY=...
 export CACHE_DIR="./cache"   # optional, enables prompt caching
 ```
-or an `llm-config.dev.yml` passed via `--llm-config`. Judges must read these from the injected `llm_config` parameter — never hardcoded. Any OpenAI-compatible client works (minima-llm, DSPy, litellm, raw); the canonical page explains the choices and how the endpoint is injected on TIRA.
+Judges must read these from the injected `llm_config` parameter — never hardcoded. Configuration is environment-variables-only: the historical `llm-config.yml` / `--llm-config` / `--submission` mechanism is no longer supported — if the repo still carries such a file or commands, help the developer migrate (delete the file, use the environment variables). Any OpenAI-compatible client works (minima-llm, DSPy, litellm, raw); the canonical page explains the choices and how the endpoint is injected on TIRA.
 
 ## Step 5 — Verify the environment
 ```bash

@@ -22,6 +22,7 @@ Run `git status --porcelain`. When output appears, triage it with the developer 
 - build artifacts, caches, venvs, output directories → append to `.gitignore` and commit that change
 - genuine source/config changes → commit them
 - anything surprising → ask before touching it
+- **Legacy llm-config.yml.** Historically the endpoint could be configured via `llm-config.yml` and `--llm-config`/`--submission`; this is no longer supported — configuration is environment-variables-only. When you find an `llm-config.yml` in the repo, those flags in a command, or `from_yaml` LLM-config calls in judge code, help the developer migrate: delete the file, strip the flags, read everything from `OPENAI_BASE_URL`/`OPENAI_MODEL`/`OPENAI_API_KEY`/`CACHE_DIR`.
 Only the *committed* state of the *current branch* is submitted. Run `git branch --show-current`; recommend `main`, and confirm intent if they are on another branch. Also confirm example judges the developer did not write are deleted, and check `pyproject.toml`: a `name` still reading `auto-judge-starterkit` means the template was never made their own — walk through renaming it, replacing the README, and owning a `judges/` entry before submitting.
 
 ## Step 3 — tira-cli, Docker, authentication
@@ -39,7 +40,7 @@ tira-cli code-submission \
     --cache-behaviour deterministic --mount-cache '$CACHE_DIR=EMPTY_DIR' \
     --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
     --task trec-auto-judge --dataset kiddie-20260605-training \
-    --command 'auto-judge run --llm-config llm-config.yml --submission --workflow /auto-judge/judges/<your-judge>/workflow.yml --variant <name> --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
+    --command 'auto-judge run --workflow /auto-judge/judges/<your-judge>/workflow.yml --variant <name> --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 ```
 - `--variant <name>` and every other `auto-judge run` flag belong **inside** the quoted `--command` (there is no `tira-cli --variant` flag).
 - `--cache-behaviour deterministic` makes tira RE-EXECUTE the judge with a disabled endpoint (`OPENAI_BASE_URL=EMPTY`) against the first run's cache — the judge must reproduce from cache alone (no hard-failing startup probes; cache keys must not include the endpoint URL).
