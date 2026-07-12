@@ -208,11 +208,17 @@ ENDPOINT_HINT = (
 
 
 def preflight(llm) -> None:
-    """Fail fast with the provider's actual error instead of N failed calls."""
+    """Warn early with the provider's actual error instead of N failed calls.
+
+    A warning, not a hard failure: with a populated prompt cache the judge can
+    complete without any network at all (e.g. TIRA's no-network local test with
+    a mounted warm cache). When calls genuinely fail, run_chain_batched raises.
+    """
     try:
         llm.invoke("Answer with the single word: pong")
     except Exception as e:
-        raise LlmEndpointError(f"LLM endpoint preflight failed: {e} — {ENDPOINT_HINT}") from e
+        print(f"[langchain_pref] WARNING: LLM endpoint preflight failed: {e} — "
+              f"continuing (a warm cache may still serve); {ENDPOINT_HINT}", file=sys.stderr)
 
 
 def run_chain_batched(chain, inputs: List[dict], max_concurrency: int, phase: str = "") -> List[str]:
