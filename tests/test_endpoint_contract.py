@@ -141,7 +141,7 @@ def test_judge_uses_injected_endpoint(workflow, tmp_path):
     assert endpoint.hits > 0, (
         "the judge never contacted the injected OPENAI_BASE_URL endpoint — it is "
         "probably not routing the task-provided environment variables into its "
-        "LLM client (non-LLM judges belong in NON_LLM_JUDGES)\n"
+        "LLM client (judges without LLM calls declare uses_llm: false in their workflow.yml)\n"
         f"stderr tail: {proc.stderr[-2000:]}"
     )
     assert "test-model" in endpoint.models_seen, (
