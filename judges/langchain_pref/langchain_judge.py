@@ -27,9 +27,12 @@ from __future__ import annotations
 import json
 import re
 import sys
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
+
+from tqdm import tqdm
 
 from autojudge_base import (
     AutoJudge,
@@ -157,10 +160,22 @@ def build_llm(llm_config: LlmConfigProtocol):
         from langchain_community.cache import SQLiteCache
         from langchain_core.globals import set_llm_cache
 
+        # The cache db holds only this judge's own responses (trusted data), so
+        # LangChain's pending-deprecation warning about `allowed_objects` for
+        # untrusted deserialization does not apply here -- silence it.
+        warnings.filterwarnings(
+            "ignore", category=PendingDeprecationWarning, message=".*allowed_objects.*"
+        )
+
         cache_dir = Path(llm_config.cache_dir)
+        if str(cache_dir) == ".":
+            # Older autojudge-base releases default an unset CACHE_DIR to Path('.');
+            # keep caching enabled but avoid littering the working directory.
+            cache_dir = Path("cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
-        set_llm_cache(SQLiteCache(database_path=str(cache_dir / "langchain_cache.db")))
-        print(f"[langchain_pref] Prompt cache: {cache_dir / 'langchain_cache.db'}", file=sys.stderr)
+        db = cache_dir / "langchain_cache.db"
+        set_llm_cache(SQLiteCache(database_path=str(db)))
+        print(f"[langchain_pref] Prompt cache: {db.resolve()}", file=sys.stderr)
 
     return ChatOpenAI(
         model=llm_config.model,
@@ -195,18 +210,26 @@ def run_chain_batched(chain, inputs: List[dict], max_concurrency: int, phase: st
 
     Individual failures are tolerated (logged, counted); when EVERY call fails
     the endpoint itself is broken and we raise instead of degrading silently.
+    A progress bar tracks completed calls so long batches never look hung.
     """
     if not inputs:
         return []
-    results = chain.batch(inputs, config={"max_concurrency": max_concurrency}, return_exceptions=True)
-    out, failures, first_error = [], 0, None
-    for r in results:
-        if isinstance(r, Exception):
-            failures += 1
-            first_error = first_error or r
-            out.append("")
-        else:
-            out.append(r)
+    out: List[str] = [""] * len(inputs)
+    failures, first_error = 0, None
+    progress = tqdm(
+        total=len(inputs), desc=f"[langchain_pref] {phase or 'LLM calls'}",
+        unit="call", file=sys.stderr, disable=len(inputs) < 2, leave=False,
+    )
+    with progress:
+        for idx, r in chain.batch_as_completed(
+            inputs, config={"max_concurrency": max_concurrency}, return_exceptions=True
+        ):
+            if isinstance(r, Exception):
+                failures += 1
+                first_error = first_error or r
+            else:
+                out[idx] = r
+            progress.update(1)
     if failures == len(inputs):
         raise LlmEndpointError(
             f"All {failures} LLM calls failed in {phase or 'batch'} "
@@ -338,6 +361,13 @@ def extract_nuggets_for_topic(
         grow_pool()
     growths = 0  # only count on-demand growths
 
+    # Progress toward the nugget target (one extraction call per round, so
+    # without this the extraction phase looks hung between log lines)
+    progress = tqdm(
+        total=target, desc=f"[langchain_pref] nuggets {topic.request_id}",
+        unit="nugget", file=sys.stderr, leave=False,
+    )
+
     while len(questions) < target and pairs_used < max_pairs:
         # Plum ordering: strongest winner first, then strongest loser
         borda = pool.borda()
@@ -374,6 +404,8 @@ def extract_nuggets_for_topic(
                 added += 1
                 if len(questions) >= target:
                     break
+        progress.update(added)
+        progress.set_postfix(pairs=pairs_used, pool=len(pool.consistent_pairs))
 
         if added == 0 and not queue[1:]:
             # DECISION POINT: the last remaining pair yielded nothing new.
@@ -381,6 +413,7 @@ def extract_nuggets_for_topic(
             if not grow_pool():
                 break
 
+    progress.close()
     stats = {
         "questions": len(questions), "pairs_used": pairs_used,
         "pool_offsets": pool.judged_offsets, "on_demand_growths": growths,
