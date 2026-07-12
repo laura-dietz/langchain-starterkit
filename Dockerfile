@@ -6,5 +6,10 @@ ADD pyproject.toml /auto-judge/
 
 WORKDIR /auto-judge
 
-RUN uv pip install --system -e .[all]
+# Install into the base image's /venv (its PATH runs /venv/bin) — a --system
+# install would be invisible at runtime, breaking any dependency added here.
+RUN . /venv/bin/activate && uv pip install -e .[all]
+
+# git metadata for provenance (tira's runtime stats look for a repo at ./)
+ADD .git /auto-judge/.git
 
