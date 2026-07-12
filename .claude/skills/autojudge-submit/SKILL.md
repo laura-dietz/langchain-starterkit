@@ -22,7 +22,7 @@ Run `git status --porcelain`. When output appears, triage it with the developer 
 - build artifacts, caches, venvs, output directories → append to `.gitignore` and commit that change
 - genuine source/config changes → commit them
 - anything surprising → ask before touching it
-Only the *committed* state of the *current branch* is submitted. Run `git branch --show-current`; recommend `main`, and confirm intent if they are on another branch. Also confirm example judges the developer did not write are deleted.
+Only the *committed* state of the *current branch* is submitted. Run `git branch --show-current`; recommend `main`, and confirm intent if they are on another branch. Also confirm example judges the developer did not write are deleted, and check `pyproject.toml`: a `name` still reading `auto-judge-starterkit` means the template was never made their own — walk through renaming it, replacing the README, and owning a `judges/` entry before submitting.
 
 ## Step 3 — tira-cli, Docker, authentication
 ```bash
