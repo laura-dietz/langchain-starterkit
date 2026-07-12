@@ -1,6 +1,6 @@
-"""Checks that the installed autojudge-base is new enough.
+"""Checks that the installed framework packages are new enough.
 
-Two layers:
+Covers `autojudge-base` and `tira`, in two layers each:
 1. against this repo's own pyproject pin (always runs), and
 2. against the pin in the upstream template — read from the `starterkit`
    (or `upstream`) git remote that the setup guide has you keep — so a clone
@@ -18,28 +18,29 @@ import pytest
 from packaging.version import Version
 
 REPO = Path(__file__).parent.parent
-PIN_RE = re.compile(r'"autojudge-base\s*>=\s*([0-9][0-9a-zA-Z.]*)"')
+PACKAGES = ("autojudge-base", "tira")
 
 
-def _installed() -> Version:
+def _installed(package: str) -> Version:
     try:
-        return Version(version("autojudge-base"))
+        return Version(version(package))
     except PackageNotFoundError:
-        pytest.fail("autojudge-base is not installed — run: uv pip install -e '.[all]'")
+        pytest.fail(f"{package} is not installed — run: uv pip install -e '.[all]'")
 
 
-def _pin_from(text: str) -> Version:
-    m = PIN_RE.search(text)
-    assert m, "no autojudge-base>=X pin found in pyproject.toml"
+def _pin_from(text: str, package: str) -> Version:
+    m = re.search(rf'"{re.escape(package)}\s*>=\s*([0-9][0-9a-zA-Z.]*)"', text)
+    assert m, f"no {package}>=X pin found in pyproject.toml"
     return Version(m.group(1))
 
 
-def test_installed_meets_local_pin():
-    """Installed autojudge-base satisfies this repo's own minimum pin."""
-    pin = _pin_from((REPO / "pyproject.toml").read_text(encoding="utf-8"))
-    installed = _installed()
+@pytest.mark.parametrize("package", PACKAGES)
+def test_installed_meets_local_pin(package):
+    """Installed package satisfies this repo's own minimum pin."""
+    pin = _pin_from((REPO / "pyproject.toml").read_text(encoding="utf-8"), package)
+    installed = _installed(package)
     assert installed >= pin, (
-        f"installed autojudge-base {installed} < pinned {pin} — "
+        f"installed {package} {installed} < pinned {pin} — "
         "run: uv pip install -e '.[all]' --refresh"
     )
 
@@ -64,15 +65,16 @@ def _upstream_pyproject() -> str:
     return ""
 
 
-def test_installed_meets_upstream_template_pin():
-    """Installed autojudge-base is the same or later than the upstream template requires."""
+@pytest.mark.parametrize("package", PACKAGES)
+def test_installed_meets_upstream_template_pin(package):
+    """Installed package is the same or later than the upstream template requires."""
     upstream = _upstream_pyproject()
     if not upstream:
         pytest.skip("no starterkit/upstream remote ref available (offline or template repo)")
-    pin = _pin_from(upstream)
-    installed = _installed()
+    pin = _pin_from(upstream, package)
+    installed = _installed(package)
     assert installed >= pin, (
-        f"installed autojudge-base {installed} < {pin} required by the upstream "
-        "template — the framework moved on; run: uv pip install --upgrade autojudge-base "
+        f"installed {package} {installed} < {pin} required by the upstream "
+        f"template — the framework moved on; run: uv pip install --upgrade {package} "
         "(and consider pulling template changes: git fetch starterkit && git merge starterkit/main)"
     )
