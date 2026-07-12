@@ -14,16 +14,14 @@ TOPICS="data/kiddie/topics/kiddie-topics.jsonl"
 RESPONSES="data/kiddie/runs/repgen/"
 TRUTH="data/kiddie/eval/kiddie_fake.eval.ir_measures.txt"
 
-# --- Run the NaiveJudge (no LLM needed) ---
-WORKFLOW="judges/naive/workflow.yml"
+# --- Run the LangChainPrefJudge (requires OPENAI_* env vars; smoke variant for speed) ---
+WORKFLOW="judges/langchain_pref/workflow.yml"
+VARIANT="smoke"
 
-# Other example judges:
-#   judges/tinyjudge/workflow.yml     (minimal LLM judge, requires API key)
-#   judges/complete_example/workflow.yml  (full protocol example, no LLM)
-
-echo "=== Running NaiveJudge on kiddie ==="
+echo "=== Running LangChainPrefJudge (${VARIANT}) on kiddie ==="
 auto-judge run \
     --workflow "${WORKFLOW}" \
+    --variant "${VARIANT}" \
     --rag-responses "${RESPONSES}" \
     --rag-topics "${TOPICS}" \
     --out-dir "${OUTDIR}"
