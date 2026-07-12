@@ -14,7 +14,7 @@ The canonical guide for setup, LLM configuration, running, caching, meta-evaluat
 
 **The decision points (new over prefnugget):** Phase 1 starts with a deliberately small pool (`initial_num_others: 2` comparisons per response). Whenever Phase 2 runs out of unconsumed pairs — or the last remaining pair yields nothing new — while the bank sits below target, the judge *decides* to judge additional preference pairs (one more comparison offset per response), recomputes Borda, and continues extracting. It gives up only when the pool cannot grow further (all pairs judged) or the `max_pairs_considered` budget is spent.
 
-LLM access uses LangChain's `ChatOpenAI` against the endpoint injected via `llm_config` (never hardcoded), with lenient regex/JSON parsing so no provider-specific tool-calling is required. Prompt caching uses LangChain's `SQLiteCache` under `$CACHE_DIR`, per the [prompt-cache contract](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/05-prompt-cache.md).
+LLM access uses LangChain's `ChatOpenAI` against the endpoint injected via `llm_config` (never hardcoded), with lenient regex/JSON parsing so no provider-specific tool-calling is required. Prompt caching uses an **endpoint-agnostic** SQLite cache under `$CACHE_DIR` (LangChain's default key includes `openai_api_base`, which would break TIRA's deterministic re-execution with a disabled endpoint — the wrapper normalizes it out), per the [prompt-cache contract](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/05-prompt-cache.md).
 
 ## Quick start
 
