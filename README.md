@@ -33,7 +33,9 @@ The **[TREC AutoJudge Participant HowTo](https://github.com/trec-auto-judge/.git
 
 The three [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills, shipped in this repo under `.claude/skills/`, walk you through every activity interactively — the HowTo pages cover the same ground for manual use.
 
-In short, getting started means: fork this repo, `uv venv && source .venv/bin/activate && uv pip install -e '.[all]'`, verify with `bash run_kiddie.sh`, and build your judge under `judges/` — with the details in the HowTo pages above.
+In short, getting started means: clone this repo into your own repository (see the HowTo's setup page), `uv venv && source .venv/bin/activate && uv pip install -e '.[all]'`, verify with `bash run_kiddie.sh`, and build your judge under `judges/` — with the details in the HowTo pages above.
+
+This repository stays a **bare-bones template**: to build on it you **must** make it your own — change the project `name` in `pyproject.toml`, replace this README with a description of your judge, and create your own `judges/<yourjudge>/` entry (deleting the examples before submission).
 
 ## What is TREC AutoJudge?
 

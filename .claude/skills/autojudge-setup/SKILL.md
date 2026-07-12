@@ -22,8 +22,8 @@ uv pip install -e '.[all]'
 ```
 The `.[all]` extra covers develop + test + evaluate + submit. If the developer just wants to write code first, the lightweight `uv pip install -e .` works; they should switch to `.[all]` before testing or submitting.
 
-## Step 3 — Make the fork theirs
-Check `pyproject.toml`: if `name` still reads `auto-judge-starterkit`, walk through renaming it, updating `description`/`authors`/`project.urls`, and adding the judge's own dependencies — then reinstall with `uv pip install -e '.[all]' --refresh`. Keep `[tool.setuptools.packages.find]` with `include = ["judges*"]` unchanged.
+## Step 3 — Make the repository theirs (MANDATORY, not cosmetic)
+Check `pyproject.toml`: if `name` still reads `auto-judge-starterkit`, the template has not been customized — this step is required, not optional. Walk through renaming it, updating `description`/`authors`/`project.urls`, and adding the judge's own dependencies — then reinstall with `uv pip install -e '.[all]' --refresh`. Keep `[tool.setuptools.packages.find]` with `include = ["judges*"]` unchanged.
 
 ## Step 4 — Configure the LLM endpoint
 If the judge calls an LLM, set the endpoint per [configure-llm-endpoint](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/02-configure-llm-endpoint.md):
