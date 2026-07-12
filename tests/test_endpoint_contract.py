@@ -39,6 +39,19 @@ def _tracked_workflows():
 
 WORKFLOWS = _tracked_workflows()
 
+# Judges that legitimately make no LLM calls: the endpoint-contact assertion is
+# expected to fail for them (xfail). strict=True keeps the list honest — when
+# such a judge starts calling an LLM, the unexpected pass fails the suite until
+# it is removed from this set. Forks: adjust for your own judges.
+NON_LLM_JUDGES = {"naive", "complete_example"}
+
+PARAMS = [
+    pytest.param(w, marks=pytest.mark.xfail(
+        reason="non-LLM judge: no endpoint contact expected", strict=True))
+    if w.parent.name in NON_LLM_JUDGES else w
+    for w in WORKFLOWS
+]
+
 KIDDIE_RESPONSES = REPO / "data" / "kiddie" / "runs" / "repgen"
 KIDDIE_TOPICS = REPO / "data" / "kiddie" / "topics" / "kiddie-topics.jsonl"
 
@@ -90,7 +103,7 @@ class _RecordingEndpoint:
         self.server.shutdown()
 
 
-@pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.parent.name)
+@pytest.mark.parametrize("workflow", PARAMS, ids=lambda p: p.parent.name)
 def test_judge_uses_injected_endpoint(workflow, tmp_path):
     endpoint = _RecordingEndpoint()
     env = dict(
@@ -119,17 +132,15 @@ def test_judge_uses_injected_endpoint(workflow, tmp_path):
         pytest.skip("judge classes failed to import in a subprocess (environment "
                     "issue; import compatibility is covered by test_examples)")
 
-    # Nonsense answers may legitimately make an LLM judge fail; the contract under
-    # test is only that the judge either talked to the injected endpoint or
-    # completed without needing an LLM at all.
-    assert endpoint.hits > 0 or proc.returncode == 0, (
-        "the judge neither contacted the injected OPENAI_BASE_URL endpoint nor "
-        "succeeded without an LLM — it is probably not routing the task-provided "
-        "environment variables into its LLM client\n"
+    # Nonsense answers may legitimately make an LLM judge fail later; the
+    # contract under test is only that it talked to the injected endpoint.
+    assert endpoint.hits > 0, (
+        "the judge never contacted the injected OPENAI_BASE_URL endpoint — it is "
+        "probably not routing the task-provided environment variables into its "
+        "LLM client (non-LLM judges belong in NON_LLM_JUDGES)\n"
         f"stderr tail: {proc.stderr[-2000:]}"
     )
-    if endpoint.hits:
-        assert "test-model" in endpoint.models_seen, (
-            f"the judge contacted the endpoint but requested {endpoint.models_seen} "
-            "instead of the injected OPENAI_MODEL"
-        )
+    assert "test-model" in endpoint.models_seen, (
+        f"the judge contacted the endpoint but requested {endpoint.models_seen} "
+        "instead of the injected OPENAI_MODEL"
+    )
