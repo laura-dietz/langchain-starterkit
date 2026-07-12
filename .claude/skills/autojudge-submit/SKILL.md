@@ -15,7 +15,7 @@ Check whether `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL` are set (`
 bash run_kiddie.sh
 pytest
 ```
-Fixing failures locally beats debugging them through a Docker build. Both must be green before continuing.
+Fixing failures locally beats debugging them through a Docker build, and `tira-cli` runs the test suite during submission, so red tests block it. Both must be green before continuing — note the starter-kit tests also enforce up-to-date framework versions (`autojudge-base`, `tira`) and template customization (project name + README).
 
 ## Step 2 — Git hygiene (help, don't just check)
 Run `git status --porcelain`. When output appears, triage it with the developer instead of just reporting it:
