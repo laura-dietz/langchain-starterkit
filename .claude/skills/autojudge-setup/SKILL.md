@@ -9,6 +9,13 @@ Walk the developer through this **interactively, one step at a time**. After eac
 
 The **canonical instructions live in the [TREC AutoJudge Participant HowTo](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/README.md)** — this skill drives its pages [setup-environment](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/01-setup-environment.md) and [configure-llm-endpoint](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/02-configure-llm-endpoint.md); defer to them and do not contradict them. This repo's README holds the kit-specific reference (example judges, kiddie dataset, project structure). Building and running the judge belongs to `/autojudge-develop`; submitting belongs to `/autojudge-submit`.
 
+## Step 0 — Check the repo wiring
+Run `git remote -v`. Two remotes should exist per the clone-and-track setup: `origin` (the developer's own repository) and `starterkit` (the template). When `starterkit` (or `upstream`) is missing — typical for a fresh clone of the judge repo on a new machine — offer to add it:
+```bash
+git remote add starterkit git@github.com:trec-auto-judge/auto-judge-starter-kit.git
+```
+It enables pulling template improvements (`git fetch starterkit && git merge starterkit/main`) and arms the framework-version tests, which otherwise skip.
+
 ## Step 1 — Create and activate a virtual environment
 ```bash
 uv venv
