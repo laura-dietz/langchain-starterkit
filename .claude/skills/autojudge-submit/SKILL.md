@@ -42,7 +42,7 @@ tira-cli code-submission \
     --command 'auto-judge run --workflow /auto-judge/judges/<your-judge>/workflow.yml --variant <name> --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 ```
 - `--variant <name>` and every other `auto-judge run` flag belong **inside** the quoted `--command` (there is no `tira-cli --variant` flag).
-- The cache flags apply to LLM judges that cache; judges without an LLM can omit them ([details](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/05-prompt-cache.md)).
+- The cache flags apply to LLM judges that cache; judges without an LLM can omit them ([details](https://github.com/trec-auto-judge/.github/blob/main/profile/howto/05-prompt-cache.md)). For a fast dry-run, offer to mount the developer's populated cache instead: `--mount-cache '$CACHE_DIR=cache'` (same `OPENAI_MODEL` as when the cache was built; the container writes to a copy). The variable must be whatever this judge actually reads — `CACHE_DIR` by convention, but other backends may use different/additional variables (repeat `--mount-cache` per variable). Keep `EMPTY_DIR` for the real submission (cold-start proof).
 
 ## Step 5 — Submit for real
 When the dry run passes, rerun the same command without `--dry-run` to upload. Repeat per judge/variant. The canonical page's "A complete session" section shows a full real transcript.
