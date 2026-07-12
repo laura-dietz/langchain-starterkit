@@ -24,6 +24,7 @@ nugget_settings:
   max_questions_per_pair: 1  # plum
   max_pairs_considered: 100
   max_concurrency: 8
+  topic_concurrency: 4  # topics extract in parallel
 
 judge_settings:
   grade_threshold: 4

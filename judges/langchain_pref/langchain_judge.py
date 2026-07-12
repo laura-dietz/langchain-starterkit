@@ -157,8 +157,9 @@ def build_llm(llm_config: LlmConfigProtocol):
     """
     if llm_config.cache_dir:
         # Prompt-cache contract: persist under CACHE_DIR, disk-based backend.
-        from langchain_community.cache import SQLiteCache
+        from langchain_community.cache import SQLAlchemyCache
         from langchain_core.globals import set_llm_cache
+        from sqlalchemy import create_engine
 
         # The cache db holds only this judge's own responses (trusted data), so
         # LangChain's pending-deprecation warning about `allowed_objects` for
@@ -174,8 +175,16 @@ def build_llm(llm_config: LlmConfigProtocol):
             cache_dir = Path("cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
         db = cache_dir / "langchain_cache.db"
-        set_llm_cache(SQLiteCache(database_path=str(db)))
+        # SQLiteCache with a busy-timeout engine: topics run concurrently and
+        # share this db, so brief write contention must wait, not error.
+        engine = create_engine(f"sqlite:///{db}", connect_args={"timeout": 30})
+        set_llm_cache(SQLAlchemyCache(engine))
         print(f"[langchain_pref] Prompt cache: {db.resolve()}", file=sys.stderr)
+
+    # Backend-specific request params arrive through llm_config.raw, e.g. in
+    # llm-config.yml:  extra_body: {reasoning: {effort: low}}   (trims gpt-oss
+    # reasoning tokens; harmless for models that ignore it)
+    extra_body = (llm_config.raw or {}).get("extra_body") or None
 
     return ChatOpenAI(
         model=llm_config.model,
@@ -184,6 +193,7 @@ def build_llm(llm_config: LlmConfigProtocol):
         temperature=0.0,
         max_retries=3,
         timeout=120,
+        extra_body=extra_body,
     )
 
 
@@ -437,7 +447,8 @@ class LangChainPrefJudge(AutoJudge):
         max_questions_per_pair=1,  # plum: one question per pair
         max_pairs_considered=100,
         grade_threshold=4,
-        max_concurrency=8,
+        max_concurrency=8,        # concurrent LLM calls within one batch
+        topic_concurrency=4,      # topics extracted in parallel (rounds within a topic stay sequential)
     )
 
     def _settings(self, kwargs: dict) -> dict:
@@ -474,15 +485,27 @@ class LangChainPrefJudge(AutoJudge):
             contact=["langchain-starterkit"],
         )
 
-        banks: List[NuggetBank] = []
-        for topic in sorted(rag_topics, key=lambda t: t.request_id):
-            responses = by_topic.get(topic.request_id, [])
-            if len(responses) < 2:
-                print(f"[langchain_pref] topic {topic.request_id}: <2 responses, skipping", file=sys.stderr)
-                continue
-            questions, stats = extract_nuggets_for_topic(llm, topic, responses, settings)
-            print(f"[langchain_pref] topic {topic.request_id}: {stats}", file=sys.stderr)
+        # Topics are independent, so they extract in parallel (the plum rounds
+        # WITHIN a topic stay sequential — each round's prompt includes the
+        # questions found so far). Banks assemble in sorted topic order, so the
+        # output stays deterministic regardless of completion order.
+        topics = [t for t in sorted(rag_topics, key=lambda t: t.request_id)
+                  if len(by_topic.get(t.request_id, [])) >= 2]
+        for t in sorted(rag_topics, key=lambda t: t.request_id):
+            if len(by_topic.get(t.request_id, [])) < 2:
+                print(f"[langchain_pref] topic {t.request_id}: <2 responses, skipping", file=sys.stderr)
 
+        from concurrent.futures import ThreadPoolExecutor
+
+        def run_topic(topic: Request):
+            return extract_nuggets_for_topic(llm, topic, by_topic[topic.request_id], settings)
+
+        with ThreadPoolExecutor(max_workers=settings["topic_concurrency"]) as pool:
+            results = list(pool.map(run_topic, topics))
+
+        banks: List[NuggetBank] = []
+        for topic, (questions, stats) in zip(topics, results):
+            print(f"[langchain_pref] topic {topic.request_id}: {stats}", file=sys.stderr)
             bank = NuggetBank(
                 query_id=topic.request_id,
                 title_query=topic.title or "",
