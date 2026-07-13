@@ -1,18 +1,22 @@
 """Consistency between a judge's workflow.yml lifecycle flags and its classes.
 
-If a judge declares it *produces* an artifact — `create_nuggets`, `create_qrels`,
-or `judge` — the class that produces it must be wired in the same `workflow.yml`.
-This is the cheap, LLM-free half of "verify your outputs": it catches a judge
-that claims to emit nuggets or qrels but has no class to build them, before a run
-ever starts, instead of failing mid-run.
+If a judge turns on a phase — `create_nuggets`, `create_qrels`, or `judge` —
+the class that runs it must actually implement that method. The runner resolves
+each phase to `nugget_class` / `qrels_class` if given, otherwise falls back to
+`judge_class` (one class may implement the whole AutoJudge protocol). This test
+resolves the same way and checks the method exists, so a judge that flips
+`create_qrels: true` but never implements `create_qrels()` fails here — before a
+run — instead of mid-run.
 
-The complementary runtime guarantee — that a produced artifact is actually
-complete (non-empty nugget banks, every expected topic scored) — is enforced by
-the workflow runner's own verification during the run, and encouraged as an
-explicit `verify(...)` call in judge code (see the develop-an-autojudge howto).
-Judges are discovered dynamically, so this never goes stale as judges change.
+This is the cheap, LLM-free half of "verify your outputs". The complementary
+runtime guarantee — that a produced artifact is complete (non-empty nugget
+banks, every expected topic scored) — is enforced by the workflow runner's own
+verification during the run, and encouraged as an explicit `verify(...)` call in
+judge code (see the develop-an-autojudge howto). Judges are discovered
+dynamically, so this never goes stale as judges change.
 """
 
+import importlib
 import subprocess
 from pathlib import Path
 
@@ -39,23 +43,35 @@ def _tracked_workflows():
 
 WORKFLOWS = _tracked_workflows()
 
-# (lifecycle flag that declares production, class that must produce it, flag default).
+# (flag that turns the phase on, method the resolved class must implement,
+#  the class key that overrides judge_class for this phase, flag default).
 # Defaults match the runner: judge runs unless disabled; nuggets/qrels are opt-in.
-PRODUCER_RULES = [
-    ("create_nuggets", "nugget_class", False),
-    ("create_qrels", "qrels_class", False),
-    ("judge", "judge_class", True),
+PHASE_RULES = [
+    ("create_nuggets", "create_nuggets", "nugget_class", False),
+    ("create_qrels", "create_qrels", "qrels_class", False),
+    ("judge", "judge", "judge_class", True),
 ]
 
 
+def _load_class(ref):
+    module_name, _, attr = ref.partition(":")
+    return getattr(importlib.import_module(module_name), attr, None)
+
+
 @pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.parent.name)
-def test_declared_outputs_have_a_producer_class(workflow):
+def test_enabled_phases_are_implemented(workflow):
     cfg = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
-    for flag, class_key, default in PRODUCER_RULES:
-        if cfg.get(flag, default):
-            assert cfg.get(class_key), (
-                f"{workflow.parent.name}: workflow.yml has {flag}: "
-                f"{cfg.get(flag, default)} but declares no {class_key} to produce "
-                f"that artifact — the run will fail when it reaches that phase. "
-                f"Wire the class, or set {flag}: false."
-            )
+    for flag, method, class_key, default in PHASE_RULES:
+        if not cfg.get(flag, default):
+            continue
+        ref = cfg.get(class_key) or cfg.get("judge_class")
+        assert ref, (
+            f"{workflow.parent.name}: {flag} is on but neither {class_key} nor "
+            f"judge_class is declared to run that phase."
+        )
+        cls = _load_class(ref)
+        assert cls is not None, f"{workflow.parent.name}: class {ref} not found"
+        assert callable(getattr(cls, method, None)), (
+            f"{workflow.parent.name}: {flag} is on and resolves to {ref}, but that "
+            f"class does not implement {method}(). Implement it, or set {flag}: false."
+        )
