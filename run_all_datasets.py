@@ -9,6 +9,7 @@ Usage:
     python run_all_datasets.py --workflow judges/naive/workflow.yml --topics assessed
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -273,6 +274,16 @@ def main() -> None:
         else:
             print(f"No datasets have required filter lists for --runs={args.runs} --topics={args.topics}", file=sys.stderr)
         sys.exit(1)
+
+    # Show the injected LLM configuration up front (auto-judge run reads these from the environment)
+    base_url: str = os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE") or "(unset)"
+    model: str = os.environ.get("OPENAI_MODEL") or "(unset)"
+    cache_dir: str = os.environ.get("CACHE_DIR") or os.environ.get("LLM_CACHE_DIR") or "(unset)"
+    print("LLM configuration (from environment):")
+    print(f"  OPENAI_BASE_URL: {base_url}")
+    print(f"  OPENAI_MODEL:    {model}")
+    print(f"  OPENAI_API_KEY:  {'set' if os.environ.get('OPENAI_API_KEY') else '(unset)'}")
+    print(f"  CACHE_DIR:       {cache_dir}")
 
     print(f"Running workflow: {workflow}")
     print(f"Datasets config: {datasets_path}")
