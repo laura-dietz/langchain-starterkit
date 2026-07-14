@@ -9,6 +9,7 @@ Usage:
     python run_all_datasets.py --workflow judges/naive/workflow.yml --topics assessed
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,8 @@ class Dataset:
     assessed_topics: List[str] = field(default_factory=list)  # Topic IDs for --topics assessed
     truth: str | None = None    # Optional: path to truth leaderboard for meta-evaluation
     corpus: str | None = None   # Optional (recommended): document corpus path or ir-datasets ID
+    tira_id: str | None = None  # Optional: TIRA dataset id, for `tira-cli upload` (data submission)
+    bucket: str | None = None   # Optional: meta-evaluation service track bucket (dragun/ragtime/rag-generation/rag-auggen)
 
 
 def load_datasets(config_path: Path) -> List[Dataset]:
@@ -45,8 +48,20 @@ def load_datasets(config_path: Path) -> List[Dataset]:
             assessed_topics=entry.get("assessed_topics", []) or [],
             truth=entry.get("truth"),
             corpus=entry.get("corpus"),
+            tira_id=entry.get("tira_id"),
+            bucket=entry.get("bucket"),
         ))
     return datasets
+
+
+def run_dir(out_dir: Path, workflow: Path, dataset_name: str, variant: str | None,
+            runs_filter: str, topics_filter: str) -> Path:
+    """Output directory for one result set, nested <dataset>/<workflow>/<variant> so different
+    datasets, judges, and variants never share a directory — each holds a single leaderboard,
+    which is what `tira-cli upload` and meta-evaluate expect. Computed in one place so the run,
+    dry-run, and summary paths cannot drift apart."""
+    leaf = f"{variant or 'default'}-{runs_filter}-{topics_filter}"
+    return out_dir / dataset_name / workflow.parent.name / leaf
 
 
 def run_meta_evaluate(dataset: Dataset, dataset_out: Path) -> None:
@@ -75,6 +90,45 @@ def run_meta_evaluate(dataset: Dataset, dataset_out: Path) -> None:
     subprocess.run(cmd)
 
 
+def run_tira_upload(dataset: Dataset, dataset_out: Path, system: str) -> None:
+    """Upload the run output to TIRA via `tira-cli upload` (data submission), if the dataset has a tira_id."""
+    if not dataset.tira_id:
+        print(f"Skipping TIRA upload for {dataset.name}: no 'tira_id' in datasets.yml")
+        return
+    if shutil.which("tira-cli") is None:
+        print("Skipping TIRA upload: tira-cli not installed (uv pip install -e '.[tira]').")
+        return
+    cmd: List[str] = [
+        "tira-cli", "upload",
+        "--dataset", dataset.tira_id,
+        "--directory", str(dataset_out),
+        "--system", system,
+    ]
+    print(f"\n=== TIRA data upload: {dataset.name} -> {dataset.tira_id} (system={system}) ===")
+    subprocess.run(cmd)
+
+
+def run_metaeval_upload(dataset: Dataset, dataset_out: Path, dest: str | None) -> None:
+    """Deposit *.eval.txt into the meta-evaluation service's per-track bucket via rsync."""
+    if not dataset.bucket:
+        print(f"Skipping meta-eval upload for {dataset.name}: no 'bucket' in datasets.yml")
+        return
+    if not dest:
+        print(f"Skipping meta-eval upload for {dataset.name}: pass --metaeval-dest (e.g. c02:/autojudge-eval/in)")
+        return
+    if shutil.which("rsync") is None:
+        print("Skipping meta-eval upload: rsync not installed.")
+        return
+    eval_files: List[Path] = sorted(dataset_out.glob("*.eval.txt"))
+    if not eval_files:
+        print(f"Skipping meta-eval upload for {dataset.name}: no *.eval.txt in {dataset_out}")
+        return
+    bucket_dest: str = dest.rstrip("/") + "/" + dataset.bucket + "/"
+    cmd: List[str] = ["rsync", "-Laur", *[str(p) for p in eval_files], bucket_dest]
+    print(f"\n=== Meta-eval service deposit: {dataset.name} -> {bucket_dest} ===")
+    subprocess.run(cmd)
+
+
 def run_workflow(
     workflow: Path,
     dataset: Dataset,
@@ -84,11 +138,13 @@ def run_workflow(
     extra_args: List[str],
     variant: str | None = None,
     meta_evaluate: bool = False,
+    upload_tira: bool = False,
+    upload_metaeval: bool = False,
+    metaeval_dest: str | None = None,
 ) -> bool:
     """Run the workflow against a single dataset. Returns True on success."""
-    # Include runs/topics (and variant, if set) in output path to separate results
-    suffix: str = f"-{variant}" if variant else "-default"
-    dataset_out: Path = out_dir / f"{dataset.name}{suffix}-{runs_filter}-{topics_filter}"
+    # Separate results by dataset/workflow/variant so different judges never share a dir
+    dataset_out: Path = run_dir(out_dir, workflow, dataset.name, variant, runs_filter, topics_filter)
     dataset_out.mkdir(parents=True, exist_ok=True)
 
     cmd: List[str] = [
@@ -101,11 +157,9 @@ def run_workflow(
     if variant:
         cmd.extend(["--variant", variant])
 
-    # Add corpus (optional but recommended)
+    # Add corpus (optional; only doc-consulting judges need it)
     if dataset.corpus:
         cmd.extend(["--corpus", dataset.corpus])
-    else:
-        print(f"Note: no 'corpus' configured for {dataset.name} in datasets.yml (recommended for nugget/qrels/judge that consult source documents)")
 
     # Add run filtering
     if runs_filter == "prio1" and dataset.prio1_runs:
@@ -139,8 +193,13 @@ def run_workflow(
                 print(f"  {p.name}")
         else:
             print("  (no files produced)")
+        system: str = f"{workflow.parent.name}-{variant or 'default'}"
         if meta_evaluate:
             run_meta_evaluate(dataset, dataset_out)
+        if upload_tira:
+            run_tira_upload(dataset, dataset_out, system)
+        if upload_metaeval:
+            run_metaeval_upload(dataset, dataset_out, metaeval_dest)
     return result.returncode == 0
 
 
@@ -153,6 +212,9 @@ def main() -> None:
     parser.add_argument("--out-dir", "-o", default="./output", help="Base output directory")
     parser.add_argument("--variant", "-v", default=None, help="Workflow variant to run (optional; omit to use the workflow's default)")
     parser.add_argument("--meta-evaluate", action="store_true", help="After each run, invoke auto-judge-evaluate meta-evaluate against the dataset's 'truth' file (if set in datasets.yml)")
+    parser.add_argument("--upload-tira", action="store_true", help="After each run, upload the output to TIRA via `tira-cli upload` (needs the dataset's 'tira_id')")
+    parser.add_argument("--upload-metaeval", action="store_true", help="After each run, deposit *.eval.txt into the meta-evaluation service's per-track bucket via rsync (needs the dataset's 'bucket' and --metaeval-dest)")
+    parser.add_argument("--metaeval-dest", default=None, metavar="DEST", help="rsync destination base for --upload-metaeval (e.g. c02:/autojudge-eval/in); the dataset's bucket is appended")
     parser.add_argument(
         "--runs", "-r",
         choices=["all", "prio1"],
@@ -220,6 +282,16 @@ def main() -> None:
             print(f"No datasets have required filter lists for --runs={args.runs} --topics={args.topics}", file=sys.stderr)
         sys.exit(1)
 
+    # Show the injected LLM configuration up front (auto-judge run reads these from the environment)
+    base_url: str = os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE") or "(unset)"
+    model: str = os.environ.get("OPENAI_MODEL") or "(unset)"
+    cache_dir: str = os.environ.get("CACHE_DIR") or os.environ.get("LLM_CACHE_DIR") or "(unset)"
+    print("LLM configuration (from environment):")
+    print(f"  OPENAI_BASE_URL: {base_url}")
+    print(f"  OPENAI_MODEL:    {model}")
+    print(f"  OPENAI_API_KEY:  {'set' if os.environ.get('OPENAI_API_KEY') else '(unset)'}")
+    print(f"  CACHE_DIR:       {cache_dir}")
+
     print(f"Running workflow: {workflow}")
     print(f"Datasets config: {datasets_path}")
     print(f"Filter: runs={args.runs}, topics={args.topics}")
@@ -234,21 +306,18 @@ def main() -> None:
         print(f"  - {d.name}{info_str}")
 
     if args.dry_run:
-        suffix: str = f"-{args.variant}" if args.variant else "-default"
         for dataset in datasets:
             print(f"\nWould run: {dataset.name}")
             cmd_parts: List[str] = [
                 f"auto-judge run --workflow {workflow}",
                 f"--rag-responses {dataset.responses}",
                 f"--rag-topics {dataset.topics}",
-                f"--out-dir {out_dir / f'{dataset.name}{suffix}-{args.runs}-{args.topics}'}",
+                f"--out-dir {run_dir(out_dir, workflow, dataset.name, args.variant, args.runs, args.topics)}",
             ]
             if args.variant:
                 cmd_parts.append(f"--variant {args.variant}")
             if dataset.corpus:
                 cmd_parts.append(f"--corpus {dataset.corpus}")
-            else:
-                print(f"  Note: no 'corpus' configured for {dataset.name}")
             if args.runs == "prio1" and dataset.prio1_runs:
                 cmd_parts.append(f"--run {' --run '.join(dataset.prio1_runs)}")
             if args.topics == "assessed" and dataset.assessed_topics:
@@ -256,14 +325,25 @@ def main() -> None:
             if extra:
                 cmd_parts.append(" ".join(extra))
             print("  " + " \\\n    ".join(cmd_parts))
+            system_name: str = f"{workflow.parent.name}-{args.variant or 'default'}"
+            ddir: Path = run_dir(out_dir, workflow, dataset.name, args.variant, args.runs, args.topics)
+            if args.upload_tira:
+                if dataset.tira_id:
+                    print(f"  # then: tira-cli upload --dataset {dataset.tira_id} --directory {ddir} --system {system_name}")
+                else:
+                    print(f"  # (skip TIRA upload: no tira_id for {dataset.name})")
+            if args.upload_metaeval:
+                if dataset.bucket and args.metaeval_dest:
+                    print(f"  # then: rsync -Laur {ddir}/*.eval.txt {args.metaeval_dest.rstrip('/')}/{dataset.bucket}/")
+                else:
+                    print(f"  # (skip meta-eval upload: needs bucket + --metaeval-dest for {dataset.name})")
         return
 
     # Run each dataset
     results: Dict[str, str] = {}
-    key_suffix: str = f"-{args.variant}" if args.variant else "-default"
     for dataset in datasets:
-        key: str = f"{dataset.name}{key_suffix}-{args.runs}-{args.topics}"
-        success: bool = run_workflow(workflow, dataset, out_dir, args.runs, args.topics, extra, variant=args.variant, meta_evaluate=args.meta_evaluate)
+        key: str = str(run_dir(out_dir, workflow, dataset.name, args.variant, args.runs, args.topics).relative_to(out_dir))
+        success: bool = run_workflow(workflow, dataset, out_dir, args.runs, args.topics, extra, variant=args.variant, meta_evaluate=args.meta_evaluate, upload_tira=args.upload_tira, upload_metaeval=args.upload_metaeval, metaeval_dest=args.metaeval_dest)
         results[key] = "OK" if success else "FAILED"
 
         # Fail fast unless --keep-going

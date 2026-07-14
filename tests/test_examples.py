@@ -1,4 +1,11 @@
-"""Smoke tests: every judge defined in this repo parses and imports."""
+"""Smoke tests for the judges defined in this repo.
+
+Judges are discovered dynamically (git-tracked judges/*/workflow.yml), so this test
+never goes stale when judges are added or removed — every judge repo inherits it
+unchanged, no per-fork customization needed (same discovery as test_endpoint_contract
+and test_workflow_consistency). Example-judge-specific assertions belong in that judge's
+own tests, not here, so a fork that deletes the examples keeps a passing suite.
+"""
 
 import importlib
 import subprocess
@@ -27,6 +34,7 @@ def _tracked_workflows():
 
 WORKFLOWS = _tracked_workflows()
 
+
 def test_judges_discovered():
     """At least one judge with a workflow.yml is defined in this repo."""
     assert WORKFLOWS, "no tracked judges/*/workflow.yml found"
@@ -34,10 +42,8 @@ def test_judges_discovered():
 
 @pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.parent.name)
 def test_workflow_parses_and_classes_import(workflow):
-    """Every judge defined in this repo has a parseable workflow.yml whose
-    declared classes import. Judges are discovered dynamically (git-tracked
-    workflow.yml files), so this test never goes stale when judges are
-    added or removed."""
+    """Every judge defined in this repo has a parseable workflow.yml whose declared
+    classes import. Discovered dynamically, so it never goes stale as judges change."""
     cfg = yaml.safe_load(workflow.read_text(encoding="utf-8"))
     refs = [cfg[k] for k in ("judge_class", "nugget_class", "qrels_class") if cfg.get(k)]
     assert refs, f"{workflow} declares no judge/nugget/qrels class"

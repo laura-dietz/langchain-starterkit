@@ -7,5 +7,9 @@ test-coverage
 cache/
 example-cache-kiddie/
 out*/
+output/
 results/
 *.zip
+
+# Fetched evaluation data (fetch_pilot_dataset.sh); never committed
+/local-data/

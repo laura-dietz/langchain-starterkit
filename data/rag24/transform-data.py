@@ -3,7 +3,11 @@ from hashlib import md5
 from pathlib import Path
 import json
 import gzip
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:  # tqdm ships in the [all] extra; fall back to a no-op wrapper
+    def tqdm(iterable, *args, **kwargs):
+        return iterable
 import ir_datasets
 
 EXPECTED_MD5 = "918bb96e714eec2e3a0c64d0771a6a6f"

@@ -1,0 +1,5 @@
+run	eval_score	truth_score
+run3	67.0	0.316
+run4	64.0	0.088
+run1	61.8	0.864
+run2	41.8	0.692
