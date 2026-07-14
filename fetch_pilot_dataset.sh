@@ -1,27 +1,32 @@
 #!/usr/bin/env bash
 #
-# fetch_pilot_dataset.sh - download the TREC AutoJudge pilot (v0.2) data into ./local-data/
+# fetch_pilot_dataset.sh - download the TREC AutoJudge pilot (v0.2.1) data into ./local-data/
 #
 # The pilot/training runs are password-protected (HTTP basic auth). Provide credentials via the
 # environment (never commit them):
 #
-#   export TREC_AUTOJUDGE_USER=trec2025        # default: trec2025
-#   export TREC_AUTOJUDGE_PASSWORD=...          # required
+#   export TREC_AUTOJUDGE_USER=...              # the login (e.g. trec2025)
+#   export TREC_AUTOJUDGE_PASSWORD=...          # the password
 #
 # Usage:
 #   ./fetch_pilot_dataset.sh                        # fetch all tracks (dragun25, rag25, ragtime25)
 #   ./fetch_pilot_dataset.sh --dataset dragun-repgen   # fetch the track for one dataset (repeatable)
 #   ./fetch_pilot_dataset.sh --keep-archive        # keep the .tar.gz after extracting
 #
-# Note: this fetches the PILOT/training runs only. The TREC 2026 AutoJudge test data releases in
-# August; a sibling fetch_test_dataset.sh will handle it. Corpora/topics for some tracks come from
-# the host tracks (see the data release page); this script fetches the released run tarballs.
+# Each tarball is self-describing: it extracts to ./local-data/<track>/ containing runs/, topics/,
+# and its own datasets.yml (responses/topics/prio1_runs/assessed_topics, relative paths). The
+# starterkit's datasets.yml references these by {track, task} and merges in tira_id/bucket, so you
+# do not hand-maintain data paths. Corpora come from the host tracks.
+#
+# Note: this fetches the PILOT/training data only. The TREC 2026 AutoJudge test data releases in
+# August; a sibling fetch_test_dataset.sh will handle it.
 
 set -euo pipefail
 
-BASE_URL="https://trec-auto-judge.cs.unh.edu/datareleases/v0.2"
+BASE_URL="https://trec-auto-judge.cs.unh.edu/datareleases/v0.2.1"
+RELEASE_SUFFIX="v2.1"     # tarball name: anonymized-runs-<track>-<RELEASE_SUFFIX>.tar.gz
 DEST="./local-data"
-USER_NAME="${TREC_AUTOJUDGE_USER:-trec2025}"
+USER_NAME="${TREC_AUTOJUDGE_USER:-}"
 
 # dataset-name (or track) -> tarball track key. rag25-gen and rag25-auggen share the rag25 tarball.
 declare -A TRACK_OF=(
@@ -44,9 +49,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [ -z "${TREC_AUTOJUDGE_PASSWORD:-}" ]; then
-  echo "Error: set TREC_AUTOJUDGE_PASSWORD (HTTP basic-auth password for the data release)." >&2
-  echo "  export TREC_AUTOJUDGE_PASSWORD=...   # ask the organizers; do not commit it" >&2
+if [ -z "$USER_NAME" ] || [ -z "${TREC_AUTOJUDGE_PASSWORD:-}" ]; then
+  echo "Error: set both the data-release credentials (HTTP basic auth; ask the organizers, do not commit):" >&2
+  echo "  export TREC_AUTOJUDGE_USER=...        # the login (e.g. trec2025)" >&2
+  echo "  export TREC_AUTOJUDGE_PASSWORD=..." >&2
   exit 1
 fi
 
@@ -67,11 +73,11 @@ fi
 
 mkdir -p "$DEST"
 for track in "${!WANT[@]}"; do
-  tarball="anonymized-runs-${track}-v2.tar.gz"
+  tarball="anonymized-runs-${track}-${RELEASE_SUFFIX}.tar.gz"
   url="$BASE_URL/$tarball"
   out="$DEST/$track"
   echo "==> Fetching $tarball"
-  mkdir -p "$out"
+  rm -rf "$out"; mkdir -p "$out"    # clean re-fetch (avoid stale files from an older release)
   tmp="$(mktemp)"
   curl -fSL --user "$USER_NAME:$TREC_AUTOJUDGE_PASSWORD" -o "$tmp" "$url"
   echo "==> Extracting into $out"
@@ -85,5 +91,6 @@ for track in "${!WANT[@]}"; do
 done
 
 echo
-echo "Done -> $DEST/. Verify the extracted paths match datasets.yml (runs/<task>/ and topics/<file>);"
-echo "if a tarball wraps its contents in a top-level directory, adjust the datasets.yml paths to match."
+echo "Done -> $DEST/. Each <track>/ ships its own datasets.yml; run_all_datasets.py reads it for"
+echo "datasets declared with 'from_release: {track, task}'. Try:"
+echo "  python run_all_datasets.py --workflow judges/<judge>/workflow.yml --dataset dragun-repgen --dry-run"
