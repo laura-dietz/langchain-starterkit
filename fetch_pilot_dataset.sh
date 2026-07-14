@@ -5,8 +5,8 @@
 # The pilot/training runs are password-protected (HTTP basic auth). Provide credentials via the
 # environment (never commit them):
 #
-#   export TREC_AUTOJUDGE_USER=trec2025        # default: trec2025
-#   export TREC_AUTOJUDGE_PASSWORD=...          # required
+#   export TREC_AUTOJUDGE_USER=...              # the login (e.g. trec2025)
+#   export TREC_AUTOJUDGE_PASSWORD=...          # the password
 #
 # Usage:
 #   ./fetch_pilot_dataset.sh                        # fetch all tracks (dragun25, rag25, ragtime25)
@@ -26,7 +26,7 @@ set -euo pipefail
 BASE_URL="https://trec-auto-judge.cs.unh.edu/datareleases/v0.2.1"
 RELEASE_SUFFIX="v2.1"     # tarball name: anonymized-runs-<track>-<RELEASE_SUFFIX>.tar.gz
 DEST="./local-data"
-USER_NAME="${TREC_AUTOJUDGE_USER:-trec2025}"
+USER_NAME="${TREC_AUTOJUDGE_USER:-}"
 
 # dataset-name (or track) -> tarball track key. rag25-gen and rag25-auggen share the rag25 tarball.
 declare -A TRACK_OF=(
@@ -49,9 +49,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [ -z "${TREC_AUTOJUDGE_PASSWORD:-}" ]; then
-  echo "Error: set TREC_AUTOJUDGE_PASSWORD (HTTP basic-auth password for the data release)." >&2
-  echo "  export TREC_AUTOJUDGE_PASSWORD=...   # ask the organizers; do not commit it" >&2
+if [ -z "$USER_NAME" ] || [ -z "${TREC_AUTOJUDGE_PASSWORD:-}" ]; then
+  echo "Error: set both the data-release credentials (HTTP basic auth; ask the organizers, do not commit):" >&2
+  echo "  export TREC_AUTOJUDGE_USER=...        # the login (e.g. trec2025)" >&2
+  echo "  export TREC_AUTOJUDGE_PASSWORD=..." >&2
   exit 1
 fi
 
